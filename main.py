@@ -5,6 +5,19 @@ import scipy
 from sklearn.feature_extraction.text import CountVectorizer
 
 def read_ris(risFile):
+    '''
+    Reads an RIS file downloaded from sciencedirect.com.
+    
+    Parameters
+    -----------
+    risFile : str, path to RIS file
+
+    Returns
+    --------
+    data : list, list of dictionaries, each corresponding to a paper
+    
+    '''
+
     with open(risFile,'r') as f:
        rawData = f.readlines()
 
@@ -21,6 +34,9 @@ def read_ris(risFile):
     return data
 
 def join_abstract(ris):
+    '''
+    Joins abstract fields that are on separate lines
+    '''
     for i,k in enumerate(ris):
         if k[:2] == 'AB':
             abstract=''.join(ris[i:])
@@ -31,6 +47,18 @@ def join_abstract(ris):
     return ris
         
 def parse_ris(ris):
+    '''
+    Parses an appropriately partitioned RIS file
+    
+    Parameters
+    -----------
+    ris : str, segment of the overall RIS file corresponding to 
+
+    Returns
+    -------
+    data : dict, parsed elements of the string into appropriate key-value pairs
+
+    '''
 
     ris = join_abstract(ris)
     
@@ -55,6 +83,10 @@ def parse_ris(ris):
 
 
 class MarkovChain:
+    '''
+    Implements a Markov chain using an sklearn-like interface
+    
+    '''
 
     def __init__(self):
         self.P = None
@@ -62,8 +94,22 @@ class MarkovChain:
 
 
     def fit(self,X):
-        # compute P - probability matrix
+        '''
+        Fits the Markov chain: generates a count matrix where
+        the jth column of the ith row corresponds to the number of times
+        word j was seen after having seen word i.
 
+        Parameters
+        -----------
+        X : list, list of strings, each corresponding to a title/abstract, etc.
+        
+        Returns
+        --------
+        Nothing.
+
+        '''
+
+        # This first bit computes the pairwise probabilities
         pairs = {}
         for i in range(len(X)):
             x = X[i].replace(',','').replace(':',' :').lower().split(' ')
@@ -83,20 +129,38 @@ class MarkovChain:
                         
 
 
+        # Do some housekeeping
+        # Append "STOP" which corresponds to stop seentence
+        # Generate vocabularies, etc.        
         self.vocabularyWords = list(pairs.keys())
         self.vocabularyWords.append('STOP')
         pairs['STOP'] = []
         self.vocabulary_ = {k:i for i,k in enumerate(self.vocabularyWords)}
         self.reverse_vocabulary_ = {i:k for i,k in enumerate(self.vocabularyWords)}
         N = len(self.vocabulary_)
-        # now compute matrix
+        
+        # Now compute count matrix P 
         self.P = scipy.sparse.csc_matrix((N,N))
         for k,i in self.vocabulary_.items():            
             ps = pd.Series(pairs[k]).groupby(pairs[k]).count()
             idx = np.in1d(self.vocabularyWords,ps.index)
             self.P[i,idx] = ps
 
-    def simulate(self,startWord=None,maxWords=40):
+    def simulate(self,startWord=None,maxWords=25):
+            '''
+            Simulate a title with the Markov chain, using an opttonal
+            start word.
+            
+            Parameters
+            ----------
+            startWord : str, optional. Default is None, i.e. random start word.
+            maxWords : int, optional. Max number of words (default 40)
+
+            Input
+            ------
+            title : str, simulated MC title
+            '''
+            
             if startWord is None:
                     startWord = np.random.choice(self.vocabularyWords)
                     
@@ -123,22 +187,6 @@ class MarkovChain:
                 
             return title
 
-
-                    
-    def combinatorial_search(words):
-        idx = np.in1d( list(self.vocabulary_.keys()), words)
-        p = self.Ps[idx,:]+.0001
-        logProb = np.log(p/p.sum())
-        permIdx=permutation(idx)
-        costs = [np.sum([logProb[permIdx[k],permIdx[k+1]]]) for permIdx in permutation(Idx) \
-                     for k in permIdx]
-                     
-        minCostIndex = np.argmin(costs)
-        
-        minComb = permIdx[minCostIndex]
-
-        return words[minComb]
-
 if __name__ == "__main__":
     fileName = 'data/alldata.ris'
 
@@ -156,14 +204,14 @@ if __name__ == "__main__":
 
     countVec.fit(abstracts)
 
-    X = countVec.transform(abstracts)
-    y = countVec.transform(titles)
-
-    Z = X
-    v = y
-
     mc = MarkovChain()
     
     mc.fit(titles)
-    newTitle = ' '.join(mc.simulate('neuronal'))
+
+    for k in range(5):
+        newTitle = ' '.join(mc.simulate(maxWords=30))
+        print(newTitle)
+        print('')
+
+        
 
