@@ -156,7 +156,7 @@ class MarkovChain:
             startWord : str, optional. Default is None, i.e. random start word.
             maxWords : int, optional. Max number of words (default 40)
 
-            Input
+            Returns
             ------
             title : str, simulated MC title
             '''
